@@ -2,21 +2,30 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <title>Memory Cards (Three.js)</title>
   <style>
     :root{
       --app-viewport-w: 100vw;
       --app-viewport-h: 100vh;
+
       --phone-w: 450px;
       --phone-h: 800px;
       --phone-scale: 1;
+
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+      --safe-left: env(safe-area-inset-left);
+      --safe-right: env(safe-area-inset-right);
+
       --hud-shadow: 0 2px 0 rgba(0,0,0,.55), 0 10px 22px rgba(0,0,0,.35);
       --ui-shadow: 0 -10px 30px rgba(0,0,0,.25);
       --text: rgba(255,255,255,.92);
       --muted: rgba(255,255,255,.72);
     }
+
     *{ box-sizing:border-box; }
+
     html,body{
       height:100%;
       min-height: var(--app-viewport-h);
@@ -24,16 +33,18 @@
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       background:#0b0e12;
       color:var(--text);
+      overflow:hidden; /* чтобы не появлялся скролл страницы */
     }
+
     body{
       display:flex; align-items:center; justify-content:center;
-      overflow:hidden;
       background:
         radial-gradient(1200px 900px at 30% 15%, rgba(126,240,255,.12), transparent 50%),
         radial-gradient(1000px 800px at 75% 25%, rgba(255,208,126,.10), transparent 55%),
         radial-gradient(1200px 900px at 60% 90%, rgba(170,140,255,.10), transparent 55%),
         linear-gradient(180deg, #07090c, #0b0e12 30%, #06070a);
     }
+
     #app{
       width: var(--phone-w);
       height: var(--phone-h);
@@ -55,11 +66,19 @@
       position: relative;
       overflow: hidden;
     }
-    #layout{ width:100%; height:100%; display:flex; flex-direction:column; }
 
-    /* STRICT vertical split */
+    /* Главный лейаут: UI берёт сколько нужно, canvas уменьшается */
+    #layout{
+      width:100%;
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+
     #canvas-container{
-      height: 82%;
+      flex: 1 1 auto;
+      min-height: 0; /* важно: чтобы flex-элемент мог сжиматься и не вызывал скролл */
       width: 100%;
       position: relative;
       z-index: 2;
@@ -68,15 +87,15 @@
         radial-gradient(700px 500px at 70% 30%, rgba(255,255,255,.04), transparent 55%),
         linear-gradient(180deg, rgba(0,0,0,.20), rgba(0,0,0,.45));
     }
+
     #ui-container{
-      height: 18%;
+      flex: 0 0 auto;
       width: 100%;
       position: relative;
       z-index: 1;
       box-shadow: var(--ui-shadow);
       border-top: 1px solid rgba(255,255,255,.10);
-      overflow:hidden;
-      /* Procedural "dark wood" */
+      overflow: hidden; /* без скролла; высоту получаем от контента */
       background:
         linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.55)),
         repeating-linear-gradient( 90deg,
@@ -93,12 +112,15 @@
         radial-gradient(140px 110px at 75% 55%, rgba(0,0,0,.35), transparent 72%),
         linear-gradient(90deg, #2a1c12, #2a1c12 20%, #24170f 50%, #2a1c12 80%, #21140d);
     }
+
     canvas{ width:100%; height:100%; display:block; touch-action:none; }
 
     /* HUD inside canvas area */
     #hud{
       position:absolute;
-      inset: 14px 14px auto 14px;
+      top: calc(14px + var(--safe-top));
+      left: calc(14px + var(--safe-left));
+      right: calc(14px + var(--safe-right));
       display:flex;
       justify-content:space-between;
       align-items:flex-start;
@@ -106,6 +128,24 @@
       z-index:3;
       gap:12px;
     }
+
+    #hud.in-ui{
+      position: relative;
+      top: auto; left: auto; right: auto;
+      margin: 0 0 10px 0;
+      inset: auto;
+      pointer-events:none;
+    }
+
+    #hud.in-ui .hud-block{
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    #hud.in-ui #timer{
+      min-width: 110px;
+    }
+
     .hud-block{
       display:flex; flex-direction:column;
       gap:6px;
@@ -117,6 +157,7 @@
       box-shadow: 0 12px 24px rgba(0,0,0,.20);
       min-width: 150px;
     }
+
     .hud-line{
       font-weight: 800;
       letter-spacing: .2px;
@@ -125,6 +166,7 @@
       text-shadow: var(--hud-shadow);
       white-space: nowrap;
     }
+
     #timer{
       font-size: 26px;
       font-weight: 900;
@@ -149,11 +191,15 @@
     #ui-inner{
       height:100%;
       padding: 12px 14px;
+      padding-bottom: calc(12px + var(--safe-bottom));
+      padding-left: calc(14px + var(--safe-left));
+      padding-right: calc(14px + var(--safe-right));
       display:flex;
       flex-direction:column;
       justify-content:space-between;
       gap:10px;
     }
+
     #controls-row{
       display:flex;
       gap:10px;
@@ -161,6 +207,7 @@
       justify-content:space-between;
       flex-wrap:wrap;
     }
+
     button{
       appearance:none;
       border: 1px solid rgba(255,255,255,.14);
@@ -177,6 +224,7 @@
       user-select:none;
       -webkit-tap-highlight-color: transparent;
     }
+
     button:active{ transform: translateY(1px) scale(.99); filter:brightness(1.07); }
     button:hover{ filter:brightness(1.06); }
 
@@ -188,7 +236,9 @@
       border: 1px solid rgba(255,255,255,.10);
       background: rgba(0,0,0,.18);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      flex-wrap:wrap;
     }
+
     .seg button{
       padding: 9px 10px;
       border-radius: 12px;
@@ -198,7 +248,9 @@
       font-weight: 900;
       font-size: 13px;
       opacity: .90;
+      white-space: nowrap;
     }
+
     .seg button.active{
       background: linear-gradient(180deg, rgba(126,240,255,.22), rgba(126,240,255,.10));
       border-color: rgba(126,240,255,.35);
@@ -217,7 +269,9 @@
       font-weight: 800;
       font-size: 13px;
     }
+
     #hint{ color: rgba(255,255,255,.70); font-weight: 800; }
+
     .pill{
       padding: 6px 10px;
       border-radius: 999px;
@@ -242,7 +296,9 @@
       pointer-events:none;
       transition: opacity .18s ease;
     }
+
     #modal.show{ opacity:1; pointer-events:auto; }
+
     #modal-card{
       width: min(92%, 360px);
       border-radius: 22px;
@@ -255,12 +311,14 @@
       padding: 18px 18px 16px;
       text-align:center;
     }
+
     #modal-card h2{
       margin: 6px 0 8px;
       font-size: 26px;
       letter-spacing: .6px;
       text-shadow: var(--hud-shadow);
     }
+
     #modal-stats{
       display:grid;
       grid-template-columns: 1fr 1fr;
@@ -268,14 +326,17 @@
       margin: 12px 0 14px;
       text-align:left;
     }
+
     .stat{
       padding: 10px 12px;
       border-radius: 16px;
       background: rgba(0,0,0,.18);
       border: 1px solid rgba(255,255,255,.10);
     }
+
     .stat .k{ font-size: 12px; color: rgba(255,255,255,.70); font-weight: 900; letter-spacing: .2px; }
     .stat .v{ margin-top:3px; font-size: 16px; font-weight: 1000; color: rgba(255,255,255,.93); }
+
     #play-again{
       width:100%;
       padding: 12px 14px;
@@ -284,12 +345,65 @@
       border-color: rgba(141,255,157,.35);
     }
 
+    /* Ландшафт на телефоне: игра слева, UI справа (без скролла, canvas подстраивается) */
+    @media (orientation: landscape) and (max-height: 520px){
+      #layout{ flex-direction: row; }
+
+      #canvas-container{
+        height: 100%;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      #ui-container{
+        height: 100%;
+        width: min(380px, 44vw);
+        border-top: 0;
+        border-left: 1px solid rgba(255,255,255,.10);
+        box-shadow: none;
+      }
+
+      #controls-row{
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .seg{
+        justify-content: space-between;
+      }
+
+      #meta-row{
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+
+    /* Сжимаем UI на очень маленькой высоте, чтобы всё влезало без скролла */
+    @media (max-height: 620px){
+      #ui-inner{
+        padding: 10px 10px;
+        padding-bottom: calc(10px + var(--safe-bottom));
+        padding-left: calc(10px + var(--safe-left));
+        padding-right: calc(10px + var(--safe-right));
+        gap:8px;
+      }
+
+      button{ padding: 8px 10px; border-radius: 12px; }
+      .seg{ padding:5px; border-radius: 14px; }
+      .seg button{ padding: 7px 8px; font-size: 12px; border-radius: 11px; }
+
+      .hud-line{ font-size: 14px; }
+      #timer{ font-size: 22px; padding: 8px 12px; min-width: 118px; }
+    }
+
     @media (max-height: 820px), (max-width: 480px){
       body{ padding: 10px; }
     }
   </style>
+
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
+
 <body>
   <div id="app" aria-label="Memory Card Game">
     <div id="layout">
@@ -350,6 +464,8 @@
   const el = {
     app: document.getElementById('app'),
     canvasContainer: document.getElementById('canvas-container'),
+    uiContainer: document.getElementById('ui-container'),
+    uiInner: document.getElementById('ui-inner'),
     moves: document.getElementById('moves'),
     matches: document.getElementById('matches'),
     timer: document.getElementById('timer'),
@@ -366,12 +482,34 @@
     mDiff: document.getElementById('m-diff'),
   };
 
-  const tg = (() => {
-    try {
-      return window.Telegram?.WebApp || null;
-    } catch (_e) {
-      return null;
+  const hudEl = document.getElementById('hud');
+  const hudHomeCanvas = el.canvasContainer;  // куда вернуть в портрете
+  const hudHomeUI = el.uiInner;              // куда унести в ландшафте
+
+  function hudShouldBeInUI(){
+    // тот же критерий, что и для ландшафта в CSS
+    return window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches;
+  }
+
+  function placeHud(){
+    const inUI = hudShouldBeInUI();
+
+    if (inUI) {
+      if (hudEl.parentElement !== hudHomeUI) {
+        hudHomeUI.prepend(hudEl);
+      }
+      hudEl.classList.add('in-ui');
+    } else {
+      if (hudEl.parentElement !== hudHomeCanvas) {
+        hudHomeCanvas.prepend(hudEl);
+      }
+      hudEl.classList.remove('in-ui');
     }
+  }
+
+  const tg = (() => {
+    try { return window.Telegram?.WebApp || null; }
+    catch (_e) { return null; }
   })();
 
   if (tg) {
@@ -390,11 +528,25 @@
   const isMobile = isMobileUA || isMobilePlatform;
 
   function getViewportSize(){
-    const hCandidates = [tg?.viewportHeight, tg?.viewportStableHeight, window.innerHeight].filter((v) => Number.isFinite(v));
-    const wCandidates = [tg?.viewportWidth, window.innerWidth].filter((v) => Number.isFinite(v));
-    const height = Math.max(320, Math.floor(Math.max(...hCandidates, 0)));
-    const width = Math.max(320, Math.floor(Math.max(...wCandidates, 0)));
-    return { width, height };
+    const vv = window.visualViewport;
+
+    const height = Math.floor(
+      tg?.viewportStableHeight ??
+      tg?.viewportHeight ??
+      vv?.height ??
+      window.innerHeight
+    );
+
+    const width = Math.floor(
+      tg?.viewportWidth ??
+      vv?.width ??
+      window.innerWidth
+    );
+
+    return {
+      width: Math.max(320, width),
+      height: Math.max(320, height),
+    };
   }
 
   function updateViewportVars(){
@@ -403,6 +555,7 @@
     document.documentElement.style.setProperty('--app-viewport-h', `${height}px`);
   }
 
+  placeHud();
   updateViewportVars();
 
   const sendWinGift = () => {
@@ -521,7 +674,7 @@
       name: 'Classic',
       table: { color: 0x3a2a1d, rough: 0.55, clear: 0.25 },
       card:  { base: 0xf6f0e8, side: 0xe6dccf },
-      backColor: 0x1c3354,              // темнее — чтобы явно отличалась
+      backColor: 0x1c3354,
       palette: ['#ff6b6b','#ffd93d','#6bcB77','#4d96ff','#b983ff','#ff8fab','#00d1b2','#f97316','#22c55e','#e11d48','#06b6d4','#a3e635'],
       glow:  { ok: 0x7CFFB2, bad: 0xFF6B6B }
     },
@@ -550,18 +703,18 @@
     [-1, -1], [0, -1], [1, -1],
   ];
   const PIP_PATTERNS = [
-    [4],                                 // 1
-    [0,8],                               // 2
-    [0,4,8],                             // 3
-    [0,2,6,8],                           // 4
-    [0,2,4,6,8],                         // 5
-    [0,2,3,5,6,8],                       // 6
-    [0,2,3,4,5,6,8],                     // 7
-    [0,1,2,3,5,6,7,8],                   // 8
-    [0,1,2,4,6,7,8],                     // 9
-    [0,1,2,3,4,5,6,7,8],                 // 10 (все)
-    [1,3,4,5,7],                         // 11 (крест)
-    [0,2,4,6,8,1,7],                     // 12 (диагонали + вертикаль)
+    [4],
+    [0,8],
+    [0,4,8],
+    [0,2,6,8],
+    [0,2,4,6,8],
+    [0,2,3,5,6,8],
+    [0,2,3,4,5,6,8],
+    [0,1,2,3,5,6,7,8],
+    [0,1,2,4,6,7,8],
+    [0,1,2,3,4,5,6,7,8],
+    [1,3,4,5,7],
+    [0,2,4,6,8,1,7],
   ];
 
   let THREE;
@@ -600,11 +753,19 @@
 
   function resizePhoneScale(){
     const { width: viewportW, height: viewportH } = getViewportSize();
-    const preferLandscape = (!isMobile) || viewportW > viewportH;
     const padding = isMobile ? 0 : 20;
+
     const safeW = Math.max(320, viewportW - padding * 2);
     const safeH = Math.max(320, viewportH - padding * 2);
 
+    if (isMobile) {
+      document.documentElement.style.setProperty('--phone-w', `${safeW}px`);
+      document.documentElement.style.setProperty('--phone-h', `${safeH}px`);
+      document.documentElement.style.setProperty('--phone-scale', '1');
+      return;
+    }
+
+    const preferLandscape = viewportW > viewportH;
     let width;
     let height;
 
@@ -804,11 +965,6 @@
     return { W, H, T, R, extrude, plane };
   }
 
-  function luminance(color){
-    // approximate linear luminance
-    return 0.2126*color.r + 0.7152*color.g + 0.0722*color.b;
-  }
-
   function createCard(cardDef, shared){
     const { theme, geos, pipGeos } = shared;
     const { W, H, T, extrude, plane } = geos;
@@ -838,7 +994,7 @@
 
     grp.add(body, rim);
 
-    // BACK: базовый цвет + рельефная “X” (чтобы обложка точно отличалась)
+    // BACK
     const backMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(theme.backColor),
       roughness: 0.70,
@@ -866,7 +1022,7 @@
     bar2.rotation.y = -Math.PI/4;
     grp.add(bar1, bar2);
 
-    // FRONT: цвет пары (без картинок) + уникальные 3D “пипсы”
+    // FRONT
     const frontColor = new THREE.Color(cardDef.color);
     const frontMat = new THREE.MeshPhysicalMaterial({
       color: frontColor,
@@ -878,36 +1034,32 @@
       emissiveIntensity: 0.0,
     });
     const front = new THREE.Mesh(plane, frontMat);
-    front.rotation.x = Math.PI; // как раньше: фронт снизу, станет сверху после флипа
+    front.rotation.x = Math.PI;
     front.position.y = -(T/2) - 0.012;
     grp.add(front);
 
-    // pip group: поворачиваем на PI, чтобы при флипе пипсы “торчали вверх”
     const pipGroup = new THREE.Group();
     pipGroup.rotation.x = Math.PI;
-    pipGroup.position.y = -(T/2) - 0.012; // базовая плоскость фронта
+    pipGroup.position.y = -(T/2) - 0.012;
     grp.add(pipGroup);
 
-    // выбор контрастного цвета пипсов
     const pipBaseColor = new THREE.Color(0x0f1116);
 
     const pipMat = new THREE.MeshStandardMaterial({
-  color: pipBaseColor,
-  roughness: 0.28,   // чуть глянца, чтобы читалось на светлом
-  metalness: 0.18,
-  emissive: new THREE.Color(0x000000),
-  emissiveIntensity: 0.0,
-});
+      color: pipBaseColor,
+      roughness: 0.28,
+      metalness: 0.18,
+      emissive: new THREE.Color(0x000000),
+      emissiveIntensity: 0.0,
+    });
 
-// Подложка/ободок под пипсами: светлая полупрозрачная,
-// чтобы чёрные точки не “проваливались” на некоторых цветах.
-const insetMat = new THREE.MeshStandardMaterial({
-  color: 0xffffff,
-  roughness: 0.9,
-  metalness: 0.0,
-  transparent: true,
-  opacity: 0.16
-});
+    const insetMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.9,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.16
+    });
 
     const insetGeo = new THREE.CircleGeometry(0.52, 28);
     insetGeo.rotateX(-Math.PI/2);
@@ -915,14 +1067,13 @@ const insetMat = new THREE.MeshStandardMaterial({
     const pipHeight = 0.18;
     const pipY = (pipHeight/2) + 0.02;
 
-    const patternIndex = cardDef.id % 12; // максимум 12 пар на hard
+    const patternIndex = cardDef.id % 12;
     const pattern = PIP_PATTERNS[patternIndex];
 
     const xScale = W * 0.20;
     const zScale = H * 0.20;
 
-    // форма пипсов (чуть разнообразия, чтобы быстрее считывалось)
-    const shapeType = cardDef.id % 4; // 0 sphere,1 cylinder,2 box,3 diamond
+    const shapeType = cardDef.id % 4;
     const geo = pipGeos[shapeType];
 
     const pipMats = [pipMat];
@@ -943,7 +1094,7 @@ const insetMat = new THREE.MeshStandardMaterial({
       pipGroup.add(pip);
     }
 
-    // Pick mesh (forgiving hitbox)
+    // Pick mesh
     const pickGeo = new THREE.BoxGeometry(W*1.06, T*1.8, H*1.06);
     const pickMat2 = new THREE.MeshBasicMaterial({ transparent:true, opacity:0.0 });
     const pick = new THREE.Mesh(pickGeo, pickMat2);
@@ -1081,7 +1232,6 @@ const insetMat = new THREE.MeshStandardMaterial({
     const { cards: deckCards } = buildDeck();
     const geos = buildCardGeometries();
 
-    // shared pip geometries
     const pipGeos = [
       new THREE.SphereGeometry(0.42, 18, 14),
       new THREE.CylinderGeometry(0.42, 0.42, 0.18, 20, 1, false),
@@ -1099,7 +1249,6 @@ const insetMat = new THREE.MeshStandardMaterial({
     const startX = -gridW/2 + geos.W/2;
     const startZ = -gridH/2 + geos.H/2;
 
-    // Table sizing
     const pad = 4.0;
     const tableW = gridW + pad*2;
     const tableH = gridH + pad*2;
@@ -1169,7 +1318,6 @@ const insetMat = new THREE.MeshStandardMaterial({
     el.matches.textContent = `Matches: 0 / ${game.pairs}`;
   }
 
-  // Вид сверху “ровно” (без наклона), как у тебя сейчас — оставляем.
   function frameCameraToGrid(gridW, gridH){
     const center = new THREE.Vector3(0, 0.35, 0);
 
@@ -1478,7 +1626,6 @@ const insetMat = new THREE.MeshStandardMaterial({
         emiss.lerpColors(emiss, new THREE.Color(theme.glow.ok), clamp(isMatchGlow + pulse*0.9, 0, 1));
       }
 
-      // фронт + пипсы подсвечиваем одинаково (чтобы считывалось)
       ud.frontMat.emissive.copy(emiss);
       ud.frontMat.emissiveIntensity = (ud.matched ? 0.75 : 0.9) * clamp((flash>0?0.8:0.0) + isMatchGlow + pulse, 0, 1);
       if (ud.pipMats){
@@ -1618,6 +1765,7 @@ const insetMat = new THREE.MeshStandardMaterial({
 
       const handleViewportChange = () => {
         updateViewportVars();
+        placeHud();
         resizeRenderer();
         const diff = DIFFS[game.diffKey];
         const geos = buildCardGeometries();
@@ -1628,6 +1776,8 @@ const insetMat = new THREE.MeshStandardMaterial({
       };
 
       window.addEventListener('resize', handleViewportChange, {passive:true});
+      window.visualViewport?.addEventListener('resize', handleViewportChange, {passive:true});
+      window.visualViewport?.addEventListener('scroll', handleViewportChange, {passive:true});
       tg?.onEvent?.('viewportChanged', handleViewportChange);
 
       handleViewportChange();
