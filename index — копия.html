@@ -390,7 +390,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
-    
+
     /* УБИРАЕМ ПРОЗРАЧНЫЕ ПЛАШКИ (оставляем только текст поверх win frame) */
     .wcell{
       padding: 10px 12px;
@@ -444,6 +444,17 @@
       #stats{ width: 180px; height: 62px; }
       #stats-text .line{ font-size: 17px; }
     }
+
+    /* FIX: запрет выделения/перетаскивания (чтобы не “подсматривать” через drag) */
+    #app, #app *{
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    img, .card, .card *{
+      -webkit-user-drag: none;
+    }
+    .card{ touch-action: manipulation; }
   </style>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -458,7 +469,7 @@
         <img id="stats-bg" alt="" />
         <div id="stats-text">
           <div class="line">Ходов: <span id="moves">0</span></div>
-          <div class="line">Раунд: <span id="round">0/0</span></div>
+          <div class="line">Отгадано: <span id="round">0/0</span></div>
         </div>
       </div>
 
@@ -524,6 +535,7 @@
     cardsDir: './карточки/',
 
     bg: './фон.jpg',
+    bgLandscape: './FomGoriz.jpg', // FIX: фон для горизонтали
 
     // рядом с html
     bottomFrame: './bottom frame.png',
@@ -552,6 +564,7 @@
 
     bg: document.getElementById('bg'),
     bottomFrame: document.getElementById('bottom-frame'),
+    bottomBar: document.getElementById('bottom-bar'), // FIX
     statsBg: document.getElementById('stats-bg'),
 
     moves: document.getElementById('moves'),
@@ -669,9 +682,13 @@
     return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
   }
 
+  // FIX: “Отгадано” показываем как карточки (2 за пару), чтобы не путать с “ходами”
   function updateHUD(){
     el.moves.textContent = String(game.moves);
-    el.round.textContent = `${game.matchedPairs}/${game.pairs}`;
+
+    const totalCards = game.cols * game.rows;
+    const foundCards = game.matchedPairs * 2;
+    el.round.textContent = `${foundCards}/${totalCards}`;
   }
 
   function startTimer(){
@@ -734,22 +751,37 @@
     return deck;
   }
 
-  // подгон поля: в wide делаем меньше множители
+  // FIX: подгон поля с учетом реального перекрытия bottom bar (если налезает — уменьшаем)
   function layoutBoard(){
-    const rect = el.stage.getBoundingClientRect();
-    const ratio = rect.width / Math.max(1, rect.height);
+    const stageRect = el.stage.getBoundingClientRect();
+    const barRect = el.bottomBar.getBoundingClientRect();
+
+    const cs = getComputedStyle(el.stage);
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const padLeft = parseFloat(cs.paddingLeft) || 0;
+    const padRight = parseFloat(cs.paddingRight) || 0;
+
+    const contentW = Math.max(1, stageRect.width - padLeft - padRight);
+
+    const contentTop = stageRect.top + padTop;
+    const contentBottomNominal = stageRect.bottom - padBottom;
+
+    // если bottom bar перекрывает сцену — ограничиваем высоту поля
+    const contentBottom = Math.min(contentBottomNominal, barRect.top - 10);
+    const contentH = Math.max(1, contentBottom - contentTop);
+
+    const ratio = contentW / Math.max(1, contentH);
     const wide = ratio > 1.20;
 
     const wMul = wide ? 0.74 : 0.96;
     const hMul = wide ? 0.74 : 0.96;
 
-
-    const maxW = rect.width * wMul;
-    const maxH = rect.height * hMul;
+    const maxW = contentW * wMul;
+    const maxH = contentH * hMul;
 
     const framePad = (game.cols >= 6 || wide) ? 12 : 18;
     const gap = (game.cols >= 6 || wide) ? 9 : 14;
-
 
     const availW = Math.max(80, maxW - framePad * 2);
     const availH = Math.max(80, maxH - framePad * 2);
@@ -780,6 +812,10 @@
     btn.className = 'card';
     btn.type = 'button';
 
+    // FIX: запретить drag у кнопки
+    btn.draggable = false;
+    btn.addEventListener('dragstart', (e) => e.preventDefault());
+
     const inner = document.createElement('div');
     inner.className = 'card-inner';
 
@@ -793,6 +829,11 @@
     symbol.className = 'symbol';
     symbol.alt = '';
     symbol.src = cardDef.face;
+
+    // FIX: запретить drag у картинки
+    symbol.draggable = false;
+    symbol.addEventListener('dragstart', (e) => e.preventDefault());
+
     front.appendChild(symbol);
 
     inner.appendChild(back);
@@ -927,8 +968,21 @@
     requestAnimationFrame(layoutBoard);
   }
 
+  // FIX: фон по ориентации
+  let currentBg = '';
+  function setBgByOrientation(){
+    const { width, height } = getViewportSize();
+    const landscape = width > height;
+    const src = u(landscape ? ASSETS.bgLandscape : ASSETS.bg);
+    if (currentBg !== src){
+      el.bg.src = src;
+      currentBg = src;
+    }
+  }
+
   function initImages(){
-    el.bg.src = u(ASSETS.bg);
+    setBgByOrientation(); // вместо жесткого el.bg.src = ASSETS.bg
+
     el.bottomFrame.src = u(ASSETS.bottomFrame);
     el.statsBg.src = u(ASSETS.roundCount);
     el.winFrame.src = u(ASSETS.winFrame);
@@ -961,9 +1015,19 @@
     el.overlay.addEventListener('click', (e) => { if (e.target === el.overlay) hideWin(); });
   }
 
+  // FIX: глобально блокируем drag/drop/contextmenu внутри app
+  function lockDragAndMenu(){
+    const block = (e) => e.preventDefault();
+    el.app.addEventListener('dragstart', block);
+    el.app.addEventListener('dragover', block);
+    el.app.addEventListener('drop', block);
+    el.app.addEventListener('contextmenu', block);
+  }
+
   const handleViewportChange = () => {
     updateViewportVars();
     resizePhoneScale();
+    setBgByOrientation();
     layoutBoard();
   };
 
@@ -976,9 +1040,11 @@
     handleViewportChange();
     initImages();
     wireUI();
+    lockDragAndMenu();
 
     const preloadList = [
       u(ASSETS.bg),
+      u(ASSETS.bgLandscape), // FIX
       u(ASSETS.bottomFrame),
       u(ASSETS.roundCount),
       u(ASSETS.winFrame),
